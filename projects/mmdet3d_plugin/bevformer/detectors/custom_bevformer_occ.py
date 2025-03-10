@@ -40,7 +40,10 @@ class CustomBEVFormerOcc(MVXTwoStageDetector):
                  train_cfg=None,
                  test_cfg=None,
                  pretrained=None,
-                 video_test_mode=False
+                 video_test_mode=False,
+
+                 occ_vae=None,
+
                  ):
 
         super(CustomBEVFormerOcc,
@@ -48,7 +51,8 @@ class CustomBEVFormerOcc(MVXTwoStageDetector):
                              pts_middle_encoder, pts_fusion_layer,
                              img_backbone, pts_backbone, img_neck, pts_neck,
                              pts_bbox_head, img_roi_head, img_rpn_head,
-                             train_cfg, test_cfg, pretrained)
+                             train_cfg, test_cfg, pretrained,
+                             occ_vae)
         self.grid_mask = GridMask(
             True, True, rotate=1, offset=False, ratio=0.5, mode=1, prob=0.7)
         self.use_grid_mask = use_grid_mask
@@ -130,8 +134,10 @@ class CustomBEVFormerOcc(MVXTwoStageDetector):
             dict: Losses of each branch.
         """
 
+        # outs = self.pts_bbox_head(
+        #     pts_feats, img_metas, prev_bev)
         outs = self.pts_bbox_head(
-            pts_feats, img_metas, prev_bev)
+            pts_feats, img_metas, prev_bev, voxel_semantics)
         loss_inputs = [voxel_semantics, mask_camera, outs]
         losses = self.pts_bbox_head.loss(*loss_inputs, img_metas=img_metas)
         return losses
@@ -151,6 +157,8 @@ class CustomBEVFormerOcc(MVXTwoStageDetector):
         augmentations.
         """
         if return_loss:
+            #  with torch.no_grad():
+
             return self.forward_train(**kwargs)
         else:
             return self.forward_test(**kwargs)
@@ -268,8 +276,11 @@ class CustomBEVFormerOcc(MVXTwoStageDetector):
             img_metas[0][0]['can_bus'][-1] = 0
             img_metas[0][0]['can_bus'][:3] = 0
 
+        # new_prev_bev, occ_results = self.simple_test(
+        #     img_metas[0], img[0], prev_bev=self.prev_frame_info['prev_bev'], voxel_semantics=voxel_semantics[0], **kwargs)
         new_prev_bev, occ_results = self.simple_test(
-            img_metas[0], img[0], prev_bev=self.prev_frame_info['prev_bev'], **kwargs)
+            img_metas[0], img[0], prev_bev=None, voxel_semantics=voxel_semantics[0], **kwargs)
+
         # During inference, we save the BEV features and ego motion of each timestamp.
 
         self.prev_frame_info['prev_pos'] = tmp_pos
@@ -277,22 +288,22 @@ class CustomBEVFormerOcc(MVXTwoStageDetector):
         self.prev_frame_info['prev_bev'] = new_prev_bev
         return occ_results
 
-    def simple_test_pts(self, x, img_metas, prev_bev=None, rescale=False):
+    def simple_test_pts(self, x, img_metas, prev_bev=None, voxel_semantics=None, rescale=False):
         """Test function"""
-        outs = self.pts_bbox_head(x, img_metas, prev_bev=prev_bev, test=True)
+        outs = self.pts_bbox_head(x, img_metas, prev_bev=prev_bev, voxel_semantics=voxel_semantics, test=True)
 
         occ = self.pts_bbox_head.get_occ(
             outs, img_metas, rescale=rescale)
 
         return outs['bev_embed'], occ
 
-    def simple_test(self, img_metas, img=None, prev_bev=None, rescale=False):
+    def simple_test(self, img_metas, img=None, prev_bev=None, voxel_semantics=None, rescale=False):
         """Test function without augmentaiton."""
         img_feats = self.extract_feat(img=img, img_metas=img_metas)
 
         # bbox_list = [dict() for i in range(len(img_metas))]
         new_prev_bev, occ = self.simple_test_pts(
-            img_feats, img_metas, prev_bev, rescale=rescale)
+            img_feats, img_metas, prev_bev, voxel_semantics, rescale=rescale)
         # for result_dict, pts_bbox in zip(bbox_list, bbox_pts):
         #     result_dict['pts_bbox'] = pts_bbox
         return new_prev_bev, occ

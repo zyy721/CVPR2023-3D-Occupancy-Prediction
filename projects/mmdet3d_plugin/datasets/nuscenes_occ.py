@@ -33,6 +33,10 @@ class NuSceneOcc(NuScenesDataset):
         self.bev_size = bev_size
         self.data_infos = self.load_annotations(self.ann_file)
 
+    # def __len__(self):
+        
+    #     return 2
+
     def load_annotations(self, ann_file):
         """Load annotations from ann_file.
 

@@ -37,6 +37,16 @@ bev_w_ = 200
 # queue_length = 4 # each sequence contains `queue_length` frames.
 queue_length = 1 # each sequence contains `queue_length` frames.
 
+
+# occ_vae
+occ_vae_dim_ = 16
+expansion = 8
+base_channel = 64
+# base_channel = 96
+
+n_e_ = 512
+
+
 model = dict(
     # type='BEVFormerOcc',
     type='CustomBEVFormerOcc',
@@ -65,7 +75,9 @@ model = dict(
         num_outs=4,
         relu_before_extra_convs=True),
     pts_bbox_head=dict(
-        type='BEVFormerOccHead',
+        # type='BEVFormerOccHead',
+        type='CustomBEVFormerOccHead',
+
         pc_range=point_cloud_range,
         bev_h=bev_h_,
         bev_w=bev_w_,
@@ -85,8 +97,49 @@ model = dict(
             type='CrossEntropyLoss',
             use_sigmoid=False,
             loss_weight=1.0),
+
+
+        multi_loss = dict(
+            type='MultiLoss',
+            loss_cfgs=[
+                dict(
+                    type='ReconLoss',
+                    weight=10.0,
+                    ignore_label=-100,
+                    use_weight=False,
+                    cls_weight=None,
+                    input_dict={
+                        'logits': 'logits',
+                        'labels': 'inputs'}),
+                dict(
+                    type='LovaszLoss',
+                    weight=1.0,
+                    input_dict={
+                        'logits': 'logits',
+                        'labels': 'inputs'}),
+                # dict(
+                #     type='VQVAEEmbedLoss',
+                #     weight=1.0),
+
+                dict(
+                    type='KldLoss',
+                    # weight=0.002,
+                    weight=0.00005,
+                    input_dict={
+                        'z_mu': 'z_mu',
+                        'logvar': 'logvar'}),
+                ]),
+
+        loss_input_convertion = dict(
+            logits='logits',
+            # embed_loss='embed_loss'
+            z_mu='z_mu',
+            logvar='logvar'
+        ),
+
+
         transformer=dict(
-            type='TransformerOcc',
+            type='CustomTransformerOcc',
             pillar_h=16,
             num_classes=18,
             norm_cfg=dict(type='BN', ),
@@ -135,6 +188,86 @@ model = dict(
         ),
 
 
+        occ_vae = dict(
+            # type = 'VAERes2D',
+            type = 'CustomVAERes2D',
+            encoder_cfg=dict(
+                # type='Encoder2D',
+                type='CustomEncoder2D',
+
+                ch = base_channel, 
+                out_ch = base_channel, 
+                # ch_mult = (1,2,4), 
+                ch_mult = (1,2,4,8), 
+
+                # num_res_blocks = 2,
+                num_res_blocks = 4,
+                # attn_resolutions = (50,), 
+                attn_resolutions = (25,), 
+                dropout = 0.0, 
+                resamp_with_conv = True, 
+                in_channels = occ_vae_dim_ * expansion,
+                resolution = 200, 
+                # z_channels = base_channel * 2, 
+                # double_z = False,
+                z_channels = 32, 
+                double_z = True,
+
+            ), 
+            # decoder_cfg=dict(
+            #     # type='Decoder2D',
+            #     type='CustomDecoder2D',
+
+            #     ch = base_channel, 
+            #     out_ch = occ_vae_dim_ * expansion, 
+            #     # ch_mult = (1,2,4), 
+            #     ch_mult = (1,2,4,8), 
+            #     num_res_blocks = 2,
+            #     # attn_resolutions = (50,), 
+            #     attn_resolutions = (25,), 
+            #     dropout = 0.0, 
+            #     resamp_with_conv = True, 
+            #     in_channels = occ_vae_dim_ * expansion,
+            #     resolution = 200, 
+            #     # z_channels = base_channel * 2, 
+            #     # z_channels = base_channel, 
+            #     z_channels = 32, 
+            #     give_pre_end = False
+            # ),
+            decoder_cfg=dict(
+                # type='Decoder2D',
+                type='CustomTemporalDecoder',
+
+                ch = base_channel, 
+                out_ch = occ_vae_dim_ * expansion, 
+                # ch_mult = (1,2,4), 
+                ch_mult = (1,2,4,8), 
+                num_res_blocks = 2,
+                # attn_resolutions = (50,), 
+                attn_resolutions = (25,), 
+                dropout = 0.0, 
+                resamp_with_conv = True, 
+                in_channels = occ_vae_dim_ * expansion,
+                resolution = 200, 
+                # z_channels = base_channel * 2, 
+                # z_channels = base_channel, 
+                z_channels = 32, 
+                give_pre_end = False
+            ),
+            num_classes=18,
+            expansion=expansion, 
+            # vqvae_cfg=dict(
+            #     type='VectorQuantizer',
+            #     n_e = n_e_, 
+            #     e_dim = base_channel * 2, 
+            #     beta = 1., 
+            #     z_channels = base_channel * 2, 
+            #     use_voxel=False)
+        ),
+
+
+
+
     # model training and testing settings
     train_cfg=dict(pts=dict(
         grid_size=[512, 512, 1],
@@ -181,7 +314,8 @@ test_pipeline = [
                 type='DefaultFormatBundle3D',
                 class_names=class_names,
                 with_label=False),
-            dict(type='CustomCollect3D', keys=['img'])
+            # dict(type='CustomCollect3D', keys=['img'])
+            dict(type='CustomCollect3D', keys=['img','voxel_semantics'])
         ])
 ]
 

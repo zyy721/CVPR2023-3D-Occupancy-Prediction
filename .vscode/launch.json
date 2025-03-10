@@ -40,5 +40,44 @@
                 "--work-dir", "work_dirs/debug"
             ]
         },
+
+        {
+
+            // CONFIG=$1
+            // GPUS=$2
+            // PORT=${PORT:-28509}
+            
+            // PYTHONPATH="$(dirname $0)/..":$PYTHONPATH \
+            // python -m torch.distributed.launch --nproc_per_node=$GPUS --master_port=$PORT \
+            //     $(dirname "$0")/train.py $CONFIG --launcher pytorch ${@:3} --deterministic
+
+            "name": "test",
+            "type": "debugpy",
+            "request": "launch",
+            "python": "/home/yzhu/anaconda3/envs/uniad/bin/python",
+            "module": "torch.distributed.launch",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "env": {
+                "CUDA_VISIBLE_DEVICES": "1", // "0,1,2,3",
+                "PYTHONPATH": "${workspaceFolder}:${env:PYTHONPATH}",
+                "CUDA_BLOCKING": "1",
+                "CUDA_LAUNCH_BLOCKING": "1"
+            },
+            "args": [
+                "--nproc_per_node=1",
+                "--master_port=28889",
+                "./tools/test.py",
+                // "projects/configs/bevformer/bevformer_base_occ.py",
+                "projects/configs/bevformer/custom_bevformer_base_occ.py",
+                "ckpts/epoch_24.pth",
+                "--launcher",
+                "pytorch",
+                // "--no-validate",
+                "--eval", "bbox",
+            ]
+        },
+
+
     ]
 }
