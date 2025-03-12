@@ -1,2 +1,3 @@
 from .bevformer_occ_head import BEVFormerOccHead
 from .custom_bevformer_occ_head import CustomBEVFormerOccHead
+from .custom_bevformer_occ_3dgs_head import CustomBEVFormerOcc3dgsHead

@@ -38,7 +38,7 @@ from copy import deepcopy
 
 
 @HEADS.register_module()
-class CustomBEVFormerOccHead(BaseModule):
+class CustomBEVFormerOcc3dgsHead(BaseModule):
     """Head of Detr3D.
     Args:
         with_box_refine (bool): Whether to refine the reference points
@@ -88,7 +88,7 @@ class CustomBEVFormerOccHead(BaseModule):
         self.real_h = self.pc_range[4] - self.pc_range[1]
         self.num_cls_fcs = num_cls_fcs - 1
 
-        super(CustomBEVFormerOccHead, self).__init__()
+        super(CustomBEVFormerOcc3dgsHead, self).__init__()
 
         self.loss_occ = build_loss(loss_occ)
         self.positional_encoding = build_positional_encoding(

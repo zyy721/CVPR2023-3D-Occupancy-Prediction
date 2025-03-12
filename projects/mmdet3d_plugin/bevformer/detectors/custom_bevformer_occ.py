@@ -157,9 +157,9 @@ class CustomBEVFormerOcc(MVXTwoStageDetector):
         augmentations.
         """
         if return_loss:
-            #  with torch.no_grad():
+             with torch.no_grad():
 
-            return self.forward_train(**kwargs)
+                return self.forward_train(**kwargs)
         else:
             return self.forward_test(**kwargs)
 
@@ -292,10 +292,13 @@ class CustomBEVFormerOcc(MVXTwoStageDetector):
         """Test function"""
         outs = self.pts_bbox_head(x, img_metas, prev_bev=prev_bev, voxel_semantics=voxel_semantics, test=True)
 
-        occ = self.pts_bbox_head.get_occ(
-            outs, img_metas, rescale=rescale)
+        # occ = self.pts_bbox_head.get_occ(
+        #     outs, img_metas, rescale=rescale)
 
-        return outs['bev_embed'], occ
+        # return outs['bev_embed'], occ
+
+        return None, outs
+
 
     def simple_test(self, img_metas, img=None, prev_bev=None, voxel_semantics=None, rescale=False):
         """Test function without augmentaiton."""

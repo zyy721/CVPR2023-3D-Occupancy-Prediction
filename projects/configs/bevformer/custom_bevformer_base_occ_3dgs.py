@@ -76,7 +76,8 @@ model = dict(
         relu_before_extra_convs=True),
     pts_bbox_head=dict(
         # type='BEVFormerOccHead',
-        type='CustomBEVFormerOccHead',
+        # type='CustomBEVFormerOccHead',
+        type='CustomBEVFormerOcc3dgsHead',
 
         pc_range=point_cloud_range,
         bev_h=bev_h_,
