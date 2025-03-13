@@ -36,6 +36,8 @@ from einops import rearrange
 from projects.mmdet3d_plugin.OccWorld.loss import OPENOCC_LOSS
 from copy import deepcopy
 
+from mmdet3d.models import builder
+
 
 @HEADS.register_module()
 class CustomBEVFormerOcc3dgsHead(BaseModule):
@@ -68,6 +70,8 @@ class CustomBEVFormerOcc3dgsHead(BaseModule):
                  occ_vae=None,
                  multi_loss=None,
                  loss_input_convertion=None,
+
+                 pretrain_head=None,
 
                  **kwargs):
 
@@ -106,6 +110,10 @@ class CustomBEVFormerOcc3dgsHead(BaseModule):
             self.bev_embedding = nn.Embedding(
                 self.bev_h * self.bev_w, self.embed_dims)
 
+
+        self.pretrain_head = builder.build_head(pretrain_head)
+
+
     def init_weights(self):
         """Initialize weights of the DeformDETR head."""
         self.transformer.init_weights()
@@ -115,6 +123,9 @@ class CustomBEVFormerOcc3dgsHead(BaseModule):
         #         nn.init.constant_(m[-1].bias, bias_init)
 
         self.occ_vae.init_weights()
+
+        self.pretrain_head.init_weights()
+
 
     # @auto_fp16(apply_to=('mlvl_feats'))
     @auto_fp16(apply_to=('mlvl_feats', 'voxel_semantics'))
@@ -190,8 +201,22 @@ class CustomBEVFormerOcc3dgsHead(BaseModule):
             'z_sigma': z_sigma,
             'logvar': logvar})
 
-        logits = self.occ_vae.forward_decoder(z_sampled, shapes, voxel_semantics.shape)
-    
+        # logits = self.occ_vae.forward_decoder(z_sampled, shapes, voxel_semantics.shape)
+
+        # h = self.occ_vae.decoder.forward_give_pre_end(z_sampled, shapes, voxel_semantics.shape)
+        # logits = self.occ_vae.decoder.forward_give_after_end(h)
+        # logits = self.occ_vae.forward_decoder_w_logits(logits, shapes, voxel_semantics.shape)
+
+        uni_feats = self.occ_vae.forward_decoder_give_logits(z_sampled, shapes, voxel_semantics.shape) 
+
+        # 3dgs
+        output_dict_3dgs = self.pretrain_head(
+            uni_feats, img_metas
+        )
+        output_dict.update(output_dict_3dgs)
+
+        logits = self.occ_vae.forward_decoder_w_logits(uni_feats, shapes, voxel_semantics.shape) 
+
         output_dict.update({'logits': logits})
 
         if test:
@@ -222,7 +247,9 @@ class CustomBEVFormerOcc3dgsHead(BaseModule):
              mask_camera,
              preds_dicts,
              gt_bboxes_ignore=None,
-             img_metas=None):
+             img_metas=None,
+             target_dict=None
+             ):
 
         # loss_dict=dict()
         # occ=preds_dicts['occ']
@@ -247,6 +274,20 @@ class CustomBEVFormerOcc3dgsHead(BaseModule):
         loss, loss_dict, multi_loss_dict = self.multi_loss(loss_input)
 
         out_multi_loss_dict = {}
+
+
+        if self.pretrain_head.use_depth_consistency:
+            ## 3) Compute the RGB reconstruction loss
+            if self.pretrain_head.rgb_loss_weight > 0.0:
+                render_curr_img = preds_dicts['render_rgb']  # (bs, num_cam, 3, h, w)
+                target_img = target_dict['target_imgs']  # (bs, num_cam, 3, h, w)
+
+                rgb_loss = self.pretrain_head.rgb_loss_weight * self.pretrain_head.compute_rgb_loss(
+                    render_curr_img, target_img, target_size=self.pretrain_head.depth_ssl_size)
+                loss_rgb = {'loss_rgb' : rgb_loss}
+                out_multi_loss_dict.update(loss_rgb)
+
+
         out_multi_loss_dict['Reconloss'] = multi_loss_dict['ReconLoss']
         out_multi_loss_dict['Lovaszloss'] = multi_loss_dict['LovaszLoss']
         out_multi_loss_dict['Kldloss'] = multi_loss_dict['KldLoss']

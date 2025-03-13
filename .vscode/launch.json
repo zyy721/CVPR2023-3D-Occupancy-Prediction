@@ -69,7 +69,7 @@
             },
             "args": [
                 "--nproc_per_node=1",
-                "--master_port=28889",
+                "--master_port=28881",
                 "./tools/train.py",
                 // "projects/configs/bevformer/bevformer_base_occ.py",
                 "projects/configs/bevformer/custom_bevformer_base_occ_3dgs.py",

@@ -301,18 +301,18 @@ class PretrainHead(BaseModule):
             vtrans_type = view_cfg.pop('type', 'Uni3DViewTrans')
             self.view_trans = getattr(utils, vtrans_type)(**view_cfg)
 
-        if uni_conv_cfg is not None:
-            self.uni_conv = nn.Sequential(
-                nn.Conv3d(
-                    uni_conv_cfg["in_channels"],
-                    uni_conv_cfg["out_channels"],
-                    kernel_size=uni_conv_cfg["kernel_size"],
-                    padding=uni_conv_cfg["padding"],
-                    stride=1,
-                ),
-                nn.BatchNorm3d(uni_conv_cfg["out_channels"]),
-                nn.ReLU(inplace=True),
-            )
+        # if uni_conv_cfg is not None:
+        #     self.uni_conv = nn.Sequential(
+        #         nn.Conv3d(
+        #             uni_conv_cfg["in_channels"],
+        #             uni_conv_cfg["out_channels"],
+        #             kernel_size=uni_conv_cfg["kernel_size"],
+        #             padding=uni_conv_cfg["padding"],
+        #             stride=1,
+        #         ),
+        #         nn.BatchNorm3d(uni_conv_cfg["out_channels"]),
+        #         nn.ReLU(inplace=True),
+        #     )
 
         if render_head_cfg is not None:
             self.render_head = builder.build_head(render_head_cfg)
@@ -367,34 +367,51 @@ class PretrainHead(BaseModule):
                 nn.Linear(out_dim * 2, 1),
             )
         
-    @auto_fp16(apply_to=("pts_feats", "img_feats", "img_depth"))
+    # @auto_fp16(apply_to=("pts_feats", "img_feats", "img_depth"))
+    # def forward(self, 
+    #             pts_feats, 
+    #             img_feats, 
+    #             img_metas, 
+    #             img_depth,
+    #             img_inputs,
+    #             **kwargs):
+
+    @auto_fp16(apply_to=("uni_feats"))
     def forward(self, 
-                pts_feats, 
-                img_feats, 
-                img_metas, 
-                img_depth,
-                img_inputs,
-                **kwargs):
+                uni_feats, 
+                img_metas):
+
 
         output = dict()
 
         # Prepare the projection parameters
         lidar2cam, intrinsics = [], []
+        ego2lidar = []
         for img_meta in img_metas:
             lidar2cam.append(img_meta["lidar2cam"])
             intrinsics.append(img_meta["cam_intrinsic"])
+            ego2lidar.append(img_meta["ego2lidar"])
         lidar2cam = np.asarray(lidar2cam)  # (bs, 6, 1, 4, 4)
         intrinsics = np.asarray(intrinsics)
+        ego2lidar = np.asarray(ego2lidar)
 
-        ref_tensor = img_feats[0].float()
+        ego2cam = ego2lidar[:, None, :, :] @ lidar2cam
+
+        # ref_tensor = img_feats[0].float()
+        ref_tensor = uni_feats.float()
 
         intrinsics = ref_tensor.new_tensor(intrinsics)
+        # pose_spatial = torch.inverse(
+        #     ref_tensor.new_tensor(lidar2cam)
+        # )
         pose_spatial = torch.inverse(
-            ref_tensor.new_tensor(lidar2cam)
+            ref_tensor.new_tensor(ego2cam)
         )
 
-        output['pose_spatial'] = pose_spatial[:, :, 0]
-        output['intrinsics'] = intrinsics[:, :, 0]  # (bs, 6, 4, 4)
+        # output['pose_spatial'] = pose_spatial[:, :, 0]
+        # output['intrinsics'] = intrinsics[:, :, 0]  # (bs, 6, 4, 4)
+        output['pose_spatial'] = pose_spatial
+        output['intrinsics'] = intrinsics  # (bs, 6, 4, 4)
         output['intrinsics'][:, :, 0] *= self.render_scale[1]
         output['intrinsics'][:, :, 1] *= self.render_scale[0]
 
@@ -424,19 +441,21 @@ class PretrainHead(BaseModule):
             exit()
 
         ## 1. Prepare the volume feature from the pts features and img features
-        uni_feats = []
-        if img_feats is not None:
-            uni_feats.append(
-                self.view_trans(img_feats, img_metas=img_metas, img_depth=img_depth)
-            )
-        if pts_feats is not None:
-            uni_feats.append(pts_feats)
+        # uni_feats = []
+        # if img_feats is not None:
+        #     uni_feats.append(
+        #         self.view_trans(img_feats, img_metas=img_metas, img_depth=img_depth)
+        #     )
+        # if pts_feats is not None:
+        #     uni_feats.append(pts_feats)
 
-        uni_feats = sum(uni_feats)
-        uni_feats = self.uni_conv(uni_feats)  # (bs, c, z, y, x)
+        # uni_feats = sum(uni_feats)
+        # uni_feats = self.uni_conv(uni_feats)  # (bs, c, z, y, x)
 
-        ## 2. Prepare the features for rendering
-        _uni_feats = rearrange(uni_feats, 'b c z y x -> b x y z c')
+        # ## 2. Prepare the features for rendering
+        # _uni_feats = rearrange(uni_feats, 'b c z y x -> b x y z c')
+
+        _uni_feats = uni_feats
 
         output['volume_feat'] = _uni_feats
 

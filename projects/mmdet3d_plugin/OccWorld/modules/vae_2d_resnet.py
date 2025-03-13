@@ -1114,6 +1114,44 @@ class CustomTemporalDecoder(BaseModule):
         return h
 
 
+    # def forward_give_pre_end(self, z, shapes, input_shape):
+    #     image_only_indicator = torch.zeros(input_shape[0], input_shape[1], dtype=z.dtype, device=z.device)
+
+    #     # z: bs*F, C, H, W
+    #     self.last_z_shape = z.shape
+
+    #     # timestep embedding
+    #     temb = None
+
+    #     # z to block_in
+    #     h = self.conv_in(z)
+
+    #     # middle
+    #     h = self.mid.block_1(h, temb, image_only_indicator)
+    #     h = self.mid.attn_1(h)
+    #     h = self.mid.block_2(h, temb, image_only_indicator)
+
+    #     # upsampling
+    #     for i_level in reversed(range(self.num_resolutions)):
+    #         # for i_block in range(self.num_res_blocks+1):
+    #         for i_block in range(self.num_res_blocks): # change this to align encoder
+    #             h = self.up[i_level].block[i_block](h, temb, image_only_indicator)
+    #             if len(self.up[i_level].attn) > 0:
+    #                 h = self.up[i_level].attn[i_block](h)
+    #         if i_level != 0:
+    #             h = self.up[i_level].upsample(h, shapes.pop())
+
+    #     return h
+    
+
+    # def forward_give_after_end(self, h):
+    #     h = self.norm_out(h)
+    #     h = nonlinearity(h)
+    #     h = self.conv_out(h)
+    #     return h
+
+
+
 @MODELS.register_module()
 class CustomVAERes2D(BaseModule):
     def __init__(
@@ -1191,14 +1229,38 @@ class CustomVAERes2D(BaseModule):
         return similarity.reshape(bs, F, H, W, D, self.num_cls)
 
 
-    def forward_decoder_logits(self, z, shapes, input_shape):
+    def forward_decoder_give_logits(self, z, shapes, input_shape):
         image_only_indicator = torch.zeros(input_shape[0], input_shape[1], dtype=z.dtype, device=z.device)
         logits = self.decoder(z, shapes, image_only_indicator)
 
         bs, F, H, W, D = input_shape
-        logits = logits.permute(0, 2, 3, 1).reshape(-1, D, self.expansion)
-
+        # logits = logits.permute(0, 2, 3, 1).reshape(-1, D, self.expansion)
+        logits = logits.permute(0, 2, 3, 1).reshape(bs*F, H, W, D, self.expansion)
         return logits
+    
+
+    def forward_decoder_w_logits(self, logits, shapes, input_shape):
+        # image_only_indicator = torch.zeros(input_shape[0], input_shape[1], dtype=z.dtype, device=z.device)
+        # logits = self.decoder(z, shapes, image_only_indicator)
+
+        bs, F, H, W, D = input_shape
+        # logits = logits.permute(0, 2, 3, 1).reshape(-1, D, self.expansion)
+        logits = logits.reshape(-1, D, self.expansion)
+        template = self.class_embeds.weight.T.unsqueeze(0) # 1, expansion, cls
+        similarity = torch.matmul(logits, template) # -1, D, cls
+        # pred = similarity.argmax(dim=-1) # -1, D
+        # pred = pred.reshape(bs, F, H, W, D)
+        return similarity.reshape(bs, F, H, W, D, self.num_cls)
+
+
+    # def forward_decoder_w_logits(self, logits, shapes, input_shape):
+    #     bs, F, H, W, D = input_shape
+    #     logits = logits.permute(0, 2, 3, 1).reshape(-1, D, self.expansion)
+    #     template = self.class_embeds.weight.T.unsqueeze(0) # 1, expansion, cls
+    #     similarity = torch.matmul(logits, template) # -1, D, cls
+    #     # pred = similarity.argmax(dim=-1) # -1, D
+    #     # pred = pred.reshape(bs, F, H, W, D)
+    #     return similarity.reshape(bs, F, H, W, D, self.num_cls)
 
 
     def forward(self, x, **kwargs):

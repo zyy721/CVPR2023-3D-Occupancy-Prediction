@@ -7,7 +7,7 @@ from mmcv.cnn import xavier_init
 from mmcv.runner.base_module import BaseModule
 from mmdet.models.backbones.resnet import BasicBlock
 from mmcv.cnn import build_conv_layer
-from projects.mmdet3d_plugin.ops import voxel_pool
+# from projects.mmdet3d_plugin.ops import voxel_pool
 
 
 class _ASPPModule(nn.Module):

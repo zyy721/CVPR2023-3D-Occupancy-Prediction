@@ -6,7 +6,7 @@ from mmcv.runner import force_fp32, auto_fp16
 from mmcv.cnn import xavier_init
 from mmcv.runner.base_module import BaseModule
 from mmcv.cnn import Conv2d
-from projects.mmdet3d_plugin.ops import voxel_pool
+# from projects.mmdet3d_plugin.ops import voxel_pool
 
 
 class Uni3DVoxelPool(BaseModule):

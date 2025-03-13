@@ -47,9 +47,24 @@ base_channel = 64
 n_e_ = 512
 
 
+# uni3dgs
+render_size = [180, 320]
+depth_ssl_size = [180, 320]  # the image size used for warping in depth SSL
+use_semantic = False
+
+occ_voxel_size = [0.4, 0.4, 0.4]
+
+unified_voxel_shape = [
+    int((point_cloud_range[3] - point_cloud_range[0]) / occ_voxel_size[0]),
+    int((point_cloud_range[4] - point_cloud_range[1]) / occ_voxel_size[1]),
+    int((point_cloud_range[5] - point_cloud_range[2]) / occ_voxel_size[2]),
+]
+
+
 model = dict(
     # type='BEVFormerOcc',
-    type='CustomBEVFormerOcc',
+    # type='CustomBEVFormerOcc',
+    type='CustomBEVFormerOcc3dgs',
 
     # use_grid_mask=True,
     use_grid_mask=False,
@@ -267,6 +282,66 @@ model = dict(
         ),
 
 
+        pretrain_head=dict(
+            type="PretrainHead",
+            save_dir="results/vis/3dgs_cam_vs0.1_pretrain_rgb_ssl_abl",
+            use_depth_consistency=True,
+            depth_loss_weight=0.0,
+            # rgb_loss_weight=1.0,
+            rgb_loss_weight=10.0,
+
+            use_depth_gt_loss=False,
+            opt=dict(
+                avg_reprojection=False,
+                disable_automasking=False,
+                disparity_smoothness=0.001,
+            ),
+            in_channels=128,
+            use_semantic=use_semantic,
+            depth_ssl_size=depth_ssl_size,  # the image size for image warping in depth SSL
+            render_scale=[render_size[0] / 900, 
+                        render_size[1] / 1600],
+            render_head_cfg=dict(
+                type="GaussianSplattingDecoder",
+                semantic_head=use_semantic,
+                render_size=render_size,
+                depth_range=[0.1, 64],
+                pc_range=point_cloud_range,
+                voxels_size=unified_voxel_shape,
+                volume_size=unified_voxel_shape,
+                learn_gs_scale_rot=True,
+                offset_scale=0.5,
+                gs_scale=0.6,
+                gs_scale_min=0.2,
+                gs_scale_max=0.7,
+                
+                in_channels=8,
+
+            ),
+            # view_cfg=dict(
+            #     type="Uni3DViewTrans",
+            #     pc_range=point_cloud_range,
+            #     voxel_size=unified_voxel_size,
+            #     voxel_shape=unified_voxel_shape,
+            #     frustum_range=frustum_range,
+            #     frustum_size=frustum_size,
+            #     num_convs=0,
+            #     keep_sweep_dim=False,
+            #     fp16_enabled=fp16_enabled,
+            # ),
+            # uni_conv_cfg=dict(
+            #     in_channels=128,
+            #     out_channels=32, 
+            #     kernel_size=3, 
+            #     padding=1
+            # ),
+
+            uni_conv_cfg=dict(
+                out_channels=8, 
+            ),
+
+        ),
+
 
 
     # model training and testing settings
@@ -289,6 +364,12 @@ occ_gt_data_root='data/occ3d-nus'
 
 train_pipeline = [
     dict(type='LoadMultiViewImageFromFiles', to_float32=True),
+
+    dict(
+        type='PrepapreImageInputs',
+        input_size=depth_ssl_size,
+    ),
+
     dict(type='LoadOccGTFromFile',data_root=occ_gt_data_root),
     dict(type='PhotoMetricDistortionMultiViewImage'),
     dict(type='LoadAnnotations3D', with_bbox_3d=True, with_label_3d=True, with_attr_label=False),
@@ -297,7 +378,7 @@ train_pipeline = [
     dict(type='NormalizeMultiviewImage', **img_norm_cfg),
     dict(type='PadMultiViewImage', size_divisor=32),
     dict(type='DefaultFormatBundle3D', class_names=class_names),
-    dict(type='CustomCollect3D', keys=[ 'img','voxel_semantics','mask_lidar','mask_camera'] )
+    dict(type='CustomCollect3D', keys=[ 'img','voxel_semantics','mask_lidar','mask_camera','target_imgs'] )
 ]
 
 test_pipeline = [

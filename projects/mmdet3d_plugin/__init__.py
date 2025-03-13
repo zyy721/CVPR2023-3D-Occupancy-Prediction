@@ -9,3 +9,4 @@ from .models.backbones.vovnet import VoVNet
 from .models.utils import *
 from .models.opt.adamw import AdamW2
 from .bevformer import *
+from .Uni3DGS.dense_heads import PretrainHead

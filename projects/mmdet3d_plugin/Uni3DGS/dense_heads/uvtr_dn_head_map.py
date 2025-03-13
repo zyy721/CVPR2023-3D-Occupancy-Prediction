@@ -22,9 +22,9 @@ from mmdet.core import (
 )
 from mmcv.cnn import xavier_init, constant_init
 from .. import utils
-from projects.mmdet3d_plugin.core.bbox.iou_calculators import PairedBboxOverlaps3D
+# from projects.mmdet3d_plugin.core.bbox.iou_calculators import PairedBboxOverlaps3D
 
-from projects.mmdet3d_plugin.models.dense_heads.uvtr_dn_head import UVTRDNHead
+# from projects.mmdet3d_plugin.models.dense_heads.uvtr_dn_head import UVTRDNHead
 
 
 @HEADS.register_module()
