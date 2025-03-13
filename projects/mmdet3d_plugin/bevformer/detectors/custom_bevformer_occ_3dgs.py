@@ -166,9 +166,9 @@ class CustomBEVFormerOcc3dgs(MVXTwoStageDetector):
         augmentations.
         """
         if return_loss:
-             with torch.no_grad():
+            #  with torch.no_grad():
 
-                return self.forward_train(**kwargs)
+            return self.forward_train(**kwargs)
         else:
             return self.forward_test(**kwargs)
 
