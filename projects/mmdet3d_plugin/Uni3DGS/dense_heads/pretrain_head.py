@@ -540,15 +540,15 @@ class PretrainHead(BaseModule):
             # torch.save(semantic_output.detach().cpu(), f'{save_dir}/semantic_pred.pth')
             # torch.save(occupancy_output.detach().cpu(), f'{save_dir}/occupancy_pred.pth')
 
-            render_depth = render_results['render_depth']
+            # render_depth = render_results['render_depth']
             rgb_pred = render_results['render_rgb']
-            semantic_pred = render_results['render_semantic']
+            # semantic_pred = render_results['render_semantic']
 
-            render_gt_semantic = kwargs.get('render_gt_semantic', None)
-            render_gt_depth = kwargs.get('render_gt_depth', None)
+            # render_gt_semantic = kwargs.get('render_gt_semantic', None)
+            # render_gt_depth = kwargs.get('render_gt_depth', None)
 
-            semantic = semantic_pred.argmax(2)
-            semantic = OCC3D_PALETTE[semantic].to(semantic_pred)
+            # semantic = semantic_pred.argmax(2)
+            # semantic = OCC3D_PALETTE[semantic].to(semantic_pred)
             # visualize_image_pairs(
             #     img_inputs[0],
             #     semantic[0], # rgb_pred[0].permute(0, 2, 3, 1),
@@ -558,7 +558,7 @@ class PretrainHead(BaseModule):
             #     save_dir=save_dir
             # )
 
-            target_size = (semantic.shape[2], semantic.shape[3])  # (H, W)
+            # target_size = (semantic.shape[2], semantic.shape[3])  # (H, W)
             target_size = (180, 320)
             visualize_elements(
                 [
@@ -566,16 +566,16 @@ class PretrainHead(BaseModule):
                     #     img_inputs[0],
                     #     type='rgb'
                     # ),
-                    # VisElement(
-                    #     rgb_pred[0],
-                    #     type='rgb',
-                    #     need_denormalize=False,
-                    # ),
                     VisElement(
-                        render_depth[0],
-                        type='depth',
-                        is_sparse=False,
+                        rgb_pred[0],
+                        type='rgb',
+                        need_denormalize=False,
                     ),
+                    # VisElement(
+                    #     render_depth[0],
+                    #     type='depth',
+                    #     is_sparse=False,
+                    # ),
                     # VisElement(
                     #     semantic[0],
                     #     type='semantic',

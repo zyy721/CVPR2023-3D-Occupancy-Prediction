@@ -300,6 +300,7 @@ class CustomBEVFormerOcc3dgs(MVXTwoStageDetector):
 
     def simple_test_pts(self, x, img_metas, prev_bev=None, voxel_semantics=None, rescale=False):
         """Test function"""
+        self.pts_bbox_head.pretrain_head.vis_pred = True
         outs = self.pts_bbox_head(x, img_metas, prev_bev=prev_bev, voxel_semantics=voxel_semantics, test=True)
 
         # occ = self.pts_bbox_head.get_occ(
