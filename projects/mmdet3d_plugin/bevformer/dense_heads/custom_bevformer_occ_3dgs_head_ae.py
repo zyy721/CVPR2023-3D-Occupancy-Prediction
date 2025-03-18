@@ -40,7 +40,7 @@ from mmdet3d.models import builder
 
 
 @HEADS.register_module()
-class CustomBEVFormerOcc3dgsHead(BaseModule):
+class CustomBEVFormerOcc3dgsHeadAE(BaseModule):
     """Head of Detr3D.
     Args:
         with_box_refine (bool): Whether to refine the reference points
@@ -92,7 +92,7 @@ class CustomBEVFormerOcc3dgsHead(BaseModule):
         self.real_h = self.pc_range[4] - self.pc_range[1]
         self.num_cls_fcs = num_cls_fcs - 1
 
-        super(CustomBEVFormerOcc3dgsHead, self).__init__()
+        super(CustomBEVFormerOcc3dgsHeadAE, self).__init__()
 
         self.loss_occ = build_loss(loss_occ)
         self.positional_encoding = build_positional_encoding(
@@ -189,25 +189,22 @@ class CustomBEVFormerOcc3dgsHead(BaseModule):
                 img_metas=img_metas,
                 prev_bev=prev_bev
             )
-        # bev_embed, occ_outs = outputs
-        bev_embed = outputs
-        bev_embed = rearrange(bev_embed, 'b (h w) c -> b c h w', h=self.bev_h, w=self.bev_w)
-        z, shapes = self.occ_vae.forward_encoder_downsample(bev_embed, temb)
 
-        z_sampled, z_mu, z_sigma, logvar = self.occ_vae.sample_z(z)
+        bev_embed = outputs # [1, 40000, 256]
+        # bev_embed = rearrange(bev_embed, 'b (h w) c -> b c h w', h=self.bev_h, w=self.bev_w)
+        # z, shapes = self.occ_vae.forward_encoder_downsample(bev_embed, temb)
 
-        output_dict.update({
-            'z_mu': z_mu,
-            'z_sigma': z_sigma,
-            'logvar': logvar})
+        # z_sampled, z_mu, z_sigma, logvar = self.occ_vae.sample_z(z)
 
-        # logits = self.occ_vae.forward_decoder(z_sampled, shapes, voxel_semantics.shape)
+        # output_dict.update({
+        #     'z_mu': z_mu,
+        #     'z_sigma': z_sigma,
+        #     'logvar': logvar})
 
-        # h = self.occ_vae.decoder.forward_give_pre_end(z_sampled, shapes, voxel_semantics.shape)
-        # logits = self.occ_vae.decoder.forward_give_after_end(h)
-        # logits = self.occ_vae.forward_decoder_w_logits(logits, shapes, voxel_semantics.shape)
+        # uni_feats = self.occ_vae.forward_decoder_give_logits(z_sampled, shapes, voxel_semantics.shape) # [1, 200, 200, 16, 8]
 
-        uni_feats = self.occ_vae.forward_decoder_give_logits(z_sampled, shapes, voxel_semantics.shape) 
+        bev_embed = rearrange(bev_embed, 'b (h w) (d c) -> b h w d c', h=self.bev_h, w=self.bev_w, d=8)
+        uni_feats = bev_embed
 
         # 3dgs
         output_dict_3dgs = self.pretrain_head(
@@ -215,63 +212,45 @@ class CustomBEVFormerOcc3dgsHead(BaseModule):
         )
         output_dict.update(output_dict_3dgs)
 
-        logits = self.occ_vae.forward_decoder_w_logits(uni_feats, shapes, voxel_semantics.shape) 
+        # logits = self.occ_vae.forward_decoder_w_logits(uni_feats, shapes, voxel_semantics.shape) 
 
-        output_dict.update({'logits': logits})
+        # output_dict.update({'logits': logits})
 
-        if test:
-            pred = logits.argmax(dim=-1).detach().cuda()
-            output_dict['sem_pred'] = pred
-            pred_iou = deepcopy(pred)
+        # if test:
+        #     pred = logits.argmax(dim=-1).detach().cuda()
+        #     output_dict['sem_pred'] = pred
+        #     pred_iou = deepcopy(pred)
             
-            pred_iou[pred_iou!=17] = 1
-            pred_iou[pred_iou==17] = 0
-            output_dict['iou_pred'] = pred_iou
+        #     pred_iou[pred_iou!=17] = 1
+        #     pred_iou[pred_iou==17] = 0
+        #     output_dict['iou_pred'] = pred_iou
 
-
-        # outs = {
-        #     'bev_embed': bev_embed,
-        #     'occ':occ_outs,
-        # }
-
-        # return outs
 
         return output_dict
 
 
     @force_fp32(apply_to=('preds_dicts'))
     def loss(self,
-             # gt_bboxes_list,
-             # gt_labels_list,
              voxel_semantics,
              mask_camera,
              preds_dicts,
              gt_bboxes_ignore=None,
              img_metas=None,
              target_dict=None
-             ):
+             ):    
 
-        # loss_dict=dict()
-        # occ=preds_dicts['occ']
-        # assert voxel_semantics.min()>=0 and voxel_semantics.max()<=17
-        # losses = self.loss_single(voxel_semantics,mask_camera,occ)
-        # loss_dict['loss_occ']=losses
-        # return loss_dict
-    
+        # input_occs = voxel_semantics.unsqueeze(1).to(torch.long)
+        # target_occs = voxel_semantics.unsqueeze(1).to(torch.long)
 
-        input_occs = voxel_semantics.unsqueeze(1).to(torch.long)
-        target_occs = voxel_semantics.unsqueeze(1).to(torch.long)
-
-        loss_input = {
-            'inputs': input_occs,
-            'target_occs': target_occs,
-            # 'metas': metas
-        }
+        # loss_input = {
+        #     'inputs': input_occs,
+        #     'target_occs': target_occs,
+        # }
         
-        for loss_input_key, loss_input_val in self.loss_input_convertion.items():
-            loss_input.update({
-                loss_input_key: preds_dicts[loss_input_val]})
-        loss, loss_dict, multi_loss_dict = self.multi_loss(loss_input)
+        # for loss_input_key, loss_input_val in self.loss_input_convertion.items():
+        #     loss_input.update({
+        #         loss_input_key: preds_dicts[loss_input_val]})
+        # loss, loss_dict, multi_loss_dict = self.multi_loss(loss_input)
 
         out_multi_loss_dict = {}
 
@@ -288,9 +267,9 @@ class CustomBEVFormerOcc3dgsHead(BaseModule):
                 out_multi_loss_dict.update(loss_rgb)
 
 
-        out_multi_loss_dict['Reconloss'] = multi_loss_dict['ReconLoss']
-        out_multi_loss_dict['Lovaszloss'] = multi_loss_dict['LovaszLoss']
-        out_multi_loss_dict['Kldloss'] = multi_loss_dict['KldLoss']
+        # out_multi_loss_dict['Reconloss'] = multi_loss_dict['ReconLoss']
+        # out_multi_loss_dict['Lovaszloss'] = multi_loss_dict['LovaszLoss']
+        # out_multi_loss_dict['Kldloss'] = multi_loss_dict['KldLoss']
 
         return out_multi_loss_dict
 

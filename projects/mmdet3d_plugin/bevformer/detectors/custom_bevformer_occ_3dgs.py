@@ -168,7 +168,7 @@ class CustomBEVFormerOcc3dgs(MVXTwoStageDetector):
         if return_loss:
             #  with torch.no_grad():
 
-            return self.forward_train(**kwargs)
+                return self.forward_train(**kwargs)
         else:
             return self.forward_test(**kwargs)
 
@@ -298,10 +298,10 @@ class CustomBEVFormerOcc3dgs(MVXTwoStageDetector):
         self.prev_frame_info['prev_bev'] = new_prev_bev
         return occ_results
 
-    def simple_test_pts(self, x, img_metas, prev_bev=None, voxel_semantics=None, rescale=False):
+    def simple_test_pts(self, x, img_metas, prev_bev=None, voxel_semantics=None, rescale=False, img=None):
         """Test function"""
         self.pts_bbox_head.pretrain_head.vis_pred = True
-        outs = self.pts_bbox_head(x, img_metas, prev_bev=prev_bev, voxel_semantics=voxel_semantics, test=True)
+        outs = self.pts_bbox_head(x, img_metas, prev_bev=prev_bev, voxel_semantics=voxel_semantics, test=True, img=img)
 
         # occ = self.pts_bbox_head.get_occ(
         #     outs, img_metas, rescale=rescale)
@@ -317,7 +317,7 @@ class CustomBEVFormerOcc3dgs(MVXTwoStageDetector):
 
         # bbox_list = [dict() for i in range(len(img_metas))]
         new_prev_bev, occ = self.simple_test_pts(
-            img_feats, img_metas, prev_bev, voxel_semantics, rescale=rescale)
+            img_feats, img_metas, prev_bev, voxel_semantics, rescale=rescale, img=img)
         # for result_dict, pts_bbox in zip(bbox_list, bbox_pts):
         #     result_dict['pts_bbox'] = pts_bbox
         return new_prev_bev, occ

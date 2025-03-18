@@ -54,8 +54,15 @@ class GaussianSplattingDecoder(BaseModule):
                  vis_gt=False,
                  use_depth_loss=True,
                  filter_opacities=False,
+
+                 free_space=None,
+
                  **kwargs):
         super().__init__()
+
+
+        self.free_space = free_space
+
 
         self.render_h, self.render_w = render_size
         self.min_depth, self.max_depth = depth_range
@@ -566,7 +573,13 @@ class GaussianSplattingDecoder(BaseModule):
             opacities = torch.tanh(density_prob)  # to (-1, 1)
         gaussians.opacities = opacities
 
-        gaussians.means = xyzs + (xyz_offset.sigmoid() - 0.5) * self.offset_scale
+
+        if self.free_space == "tanh-3":
+            # free space [-2.5, 3.5]
+            gaussians.means = xyzs + (torch.tanh(xyz_offset) * 3 + 0.5) * self.offset_scale
+        else:
+            gaussians.means = xyzs + (xyz_offset.sigmoid() - 0.5) * self.offset_scale
+
 
         # Learn scale and rotation of 3D Gaussians
         if self.learn_gs_scale_rot:

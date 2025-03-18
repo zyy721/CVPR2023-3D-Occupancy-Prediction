@@ -379,7 +379,8 @@ class PretrainHead(BaseModule):
     @auto_fp16(apply_to=("uni_feats"))
     def forward(self, 
                 uni_feats, 
-                img_metas):
+                img_metas,
+                img):
 
 
         output = dict()
@@ -562,10 +563,11 @@ class PretrainHead(BaseModule):
             target_size = (180, 320)
             visualize_elements(
                 [
-                    # VisElement(
-                    #     img_inputs[0],
-                    #     type='rgb'
-                    # ),
+                    VisElement(
+                        # img_inputs[0],
+                        img,
+                        type='rgb'
+                    ),
                     VisElement(
                         rgb_pred[0],
                         type='rgb',
